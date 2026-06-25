@@ -1,0 +1,21 @@
+[Unit]
+Description=Qiaomu Lucky
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/qiaomu-lucky
+EnvironmentFile=/opt/qiaomu-lucky/.env
+ExecStart=/usr/bin/node /opt/qiaomu-lucky/server.mjs
+Restart=always
+RestartSec=3
+User=qiaomu-lucky
+Group=qiaomu-lucky
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/qiaomu-lucky/data
+
+[Install]
+WantedBy=multi-user.target
