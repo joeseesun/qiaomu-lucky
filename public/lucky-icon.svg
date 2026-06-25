@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="乔木日常抽奖">
+  <defs>
+    <linearGradient id="bg" x1="20" x2="110" y1="12" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10b981"/>
+      <stop offset="0.52" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="ticket" x1="35" x2="94" y1="38" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7ad"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <path fill="url(#ticket)" d="M31 43c0-5 4-9 9-9h48c5 0 9 4 9 9v7a10 10 0 0 0 0 20v7c0 5-4 9-9 9H40c-5 0-9-4-9-9v-7a10 10 0 0 0 0-20v-7Z"/>
+  <path fill="#fff" d="m64 45 5.4 11 12.1 1.8-8.8 8.5 2.1 12-10.8-5.7-10.8 5.7 2.1-12-8.8-8.5 12.1-1.8L64 45Z"/>
+  <path fill="#0f172a" fill-opacity=".16" d="M44 96h40a4 4 0 0 1 0 8H44a4 4 0 0 1 0-8Z"/>
+</svg>
