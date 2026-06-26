@@ -254,6 +254,9 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
     hideActivitySelector: false,
     customCss: ''
   }
+  const activityDescription = (currentActivity.description || '').trim()
+  const exchangeInstructions = (currentActivity.exchangeInstructions || '').trim()
+  const headerDescription = activityDescription || displaySettings.pageDescription || '参与抽奖，赢取精美奖品'
   const CurrentActivityIcon = getActivityIconComponent(currentActivity.icon)
 
   return (
@@ -323,7 +326,7 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
           <h1 className="mb-3 text-4xl font-bold tracking-tight text-slate-950">
             {currentActivity.name}
           </h1>
-          <p className="mb-4 text-lg text-slate-600">{displaySettings.pageDescription}</p>
+          <p className="mb-4 whitespace-pre-line text-lg text-slate-600">{headerDescription}</p>
 
           {/* 抽奖状态提示 - 增加间距 */}
           <div className="space-y-3">
@@ -400,6 +403,18 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
                   </>
                 )}
               </button>
+
+              {exchangeInstructions && (
+                <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 p-4 text-left">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-800">
+                    <Info className="h-4 w-4 text-teal-700" />
+                    兑奖说明
+                  </div>
+                  <div className="whitespace-pre-line text-sm leading-6 text-slate-600">
+                    {exchangeInstructions}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -467,8 +482,8 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
                         兑换码使用说明
                       </div>
                       <div className="space-y-2 text-left text-sm text-slate-600">
-                        {currentActivity.exchangeInstructions ? (
-                          <div className="whitespace-pre-line">{currentActivity.exchangeInstructions}</div>
+                        {exchangeInstructions ? (
+                          <div className="whitespace-pre-line">{exchangeInstructions}</div>
                         ) : (
                           <>
                             <div className="flex items-start gap-2">
