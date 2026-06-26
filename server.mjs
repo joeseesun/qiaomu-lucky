@@ -132,6 +132,8 @@ const createDefaultData = () => {
         description: '复制链接发给参与者，后台可随时调整奖品和中奖率',
         winRate: 30,
         isActive: false,
+        isArchived: false,
+        archivedAt: null,
         maxDrawsPerPhone: 1,
         createdAt,
         backgroundColor: 'from-stone-100 to-stone-200',
@@ -220,6 +222,8 @@ const normalizeData = (data) => {
     ...activity,
     id: activity.id || crypto.randomUUID(),
     createdAt: activity.createdAt || new Date().toISOString(),
+    isArchived: activity.isArchived === true,
+    archivedAt: activity.isArchived === true ? activity.archivedAt || new Date().toISOString() : null,
     maxDrawsPerPhone: Number(activity.maxDrawsPerPhone || 1),
     prizeTypes: Array.isArray(activity.prizeTypes) && activity.prizeTypes.length > 0
       ? activity.prizeTypes
@@ -639,7 +643,9 @@ const routeApi = async (req, res, url) => {
   if (method === 'GET' && pathname === '/api/public/activities') {
     const data = await loadData()
     return json(res, 200, {
-      activities: data.activities.map((activity) => publicActivity(activity, data))
+      activities: data.activities
+        .filter((activity) => activity.isArchived !== true)
+        .map((activity) => publicActivity(activity, data))
     })
   }
 
@@ -709,8 +715,12 @@ const routeApi = async (req, res, url) => {
         return { success: false, won: false, message: '抽奖活动不存在' }
       }
 
+      if (activity.isArchived) {
+        return { success: false, won: false, message: '抽奖活动已归档' }
+      }
+
       if (!activity.isActive) {
-        return { success: false, won: false, message: '抽奖活动暂未开启' }
+        return { success: false, won: false, message: '抽奖活动已下线' }
       }
 
       const now = new Date()
@@ -818,6 +828,8 @@ const routeApi = async (req, res, url) => {
       description: String(body.description || ''),
       winRate: Number(body.winRate || 0),
       isActive: body.isActive === true,
+      isArchived: body.isArchived === true,
+      archivedAt: body.isArchived === true ? body.archivedAt || new Date().toISOString() : null,
       maxDrawsPerPhone: Number(body.maxDrawsPerPhone || 1),
       backgroundColor: body.backgroundColor || 'from-stone-100 to-stone-200',
       icon: body.icon || 'Gift',
@@ -853,6 +865,14 @@ const routeApi = async (req, res, url) => {
         displaySettings: body.displaySettings ? mergeDisplaySettings(body.displaySettings) : activity.displaySettings,
         prizeTypes: Array.isArray(body.prizeTypes) ? body.prizeTypes : activity.prizeTypes
       })
+
+      activity.isArchived = activity.isArchived === true
+      if (activity.isArchived) {
+        activity.isActive = false
+        activity.archivedAt = activity.archivedAt || new Date().toISOString()
+      } else {
+        activity.archivedAt = null
+      }
 
       return adminState(data)
     })

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Settings, Plus, Trash2, Download, Upload, BarChart3, Users, Gift, Eye, EyeOff, Edit3, LogOut, Sliders, Play, Pause, ArrowLeft, Palette, Calendar, Target, Star, Trophy, Award, Crown, Gem, Loader2, AlertCircle, CheckCircle, XCircle, Link, Copy, Check } from 'lucide-react'
+import { Settings, Plus, Trash2, Download, Upload, BarChart3, Users, Gift, Eye, EyeOff, Edit3, LogOut, Sliders, Play, Pause, ArrowLeft, Palette, Calendar, Target, Star, Trophy, Award, Crown, Gem, Loader2, AlertCircle, CheckCircle, XCircle, Link, Copy, Check, Archive, RotateCcw } from 'lucide-react'
 import { useLotteryApi } from '../hooks/useLotteryApi'
 import PrizeModal from './PrizeModal'
 import PrizeTypeModal from './PrizeTypeModal'
@@ -20,6 +20,7 @@ interface ConfirmDialogState {
 }
 
 type AdminTab = 'overview' | 'activities' | 'prize-types' | 'codes' | 'records'
+type ActivityView = 'active' | 'archived'
 
 const prizeIcons = {
   'Gift': Gift,
@@ -121,6 +122,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
   const [editingPrizeType, setEditingPrizeType] = useState<PrizeType | null>(null)
   const [editingActivity, setEditingActivity] = useState<LotteryActivity | null>(null)
   const [activeTab, setActiveTab] = useState<AdminTab>('overview')
+  const [activityView, setActivityView] = useState<ActivityView>('active')
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<{
     success: boolean
@@ -136,6 +138,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
   const currentCodes = codes.filter(code => code.lotteryId === currentActivity?.id)
   const currentRecords = records.filter(record => record.lotteryId === currentActivity?.id)
   const availableCodes = getAvailableCodes(currentActivity?.id)
+  const activeActivities = activities.filter(activity => activity.isArchived !== true)
+  const archivedActivities = activities.filter(activity => activity.isArchived === true)
+  const visibleActivities = activityView === 'archived' ? archivedActivities : activeActivities
+  const currentActivityIsArchived = currentActivity?.isArchived === true
+
+  const getActivityStatus = (activity: LotteryActivity) => {
+    if (activity.isArchived) {
+      return {
+        label: '已归档',
+        textClass: 'text-slate-500',
+        badgeClass: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
+        iconWrapClass: 'bg-slate-100',
+        iconClass: 'text-slate-500'
+      }
+    }
+
+    if (activity.isActive) {
+      return {
+        label: '已上线',
+        textClass: 'text-teal-700',
+        badgeClass: 'bg-teal-50 text-teal-800 ring-1 ring-teal-100',
+        iconWrapClass: 'bg-teal-50',
+        iconClass: 'text-teal-700'
+      }
+    }
+
+    return {
+      label: '已下线',
+      textClass: 'text-amber-700',
+      badgeClass: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
+      iconWrapClass: 'bg-amber-50',
+      iconClass: 'text-amber-700'
+    }
+  }
 
   const handleAddPrize = () => {
     setEditingPrize(null)
@@ -346,13 +382,53 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
     })
   }
 
+  const handleSetActivityActive = async (activity: LotteryActivity, isActive: boolean) => {
+    if (activity.isArchived) return
+
+    try {
+      await updateActivity(activity.id, { isActive })
+    } catch (err) {
+      console.error('Error updating activity online state:', err)
+    }
+  }
+
   const handleToggleActive = async () => {
-    if (currentActivity) {
-      try {
-        await updateActivity(currentActivity.id, { isActive: !currentActivity.isActive })
-      } catch (err) {
-        console.error('Error toggling activity:', err)
+    if (!currentActivity || currentActivity.isArchived) return
+    await handleSetActivityActive(currentActivity, !currentActivity.isActive)
+  }
+
+  const handleArchiveActivity = (activity: LotteryActivity) => {
+    setConfirmDialog({
+      title: '归档抽奖活动',
+      message: `归档 "${activity.name}" 后，公开抽奖页将不再展示该活动，也不能继续抽奖；后台会保留活动、奖品码和中奖记录。确定归档吗？`,
+      confirmLabel: '归档',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await updateActivity(activity.id, {
+            isActive: false,
+            isArchived: true,
+            archivedAt: new Date().toISOString()
+          })
+          setActivityView('archived')
+          setCurrentActivity(activity.id)
+        } catch (err) {
+          console.error('Error archiving activity:', err)
+        }
       }
+    })
+  }
+
+  const handleRestoreActivity = async (activity: LotteryActivity) => {
+    try {
+      await updateActivity(activity.id, {
+        isArchived: false,
+        archivedAt: null
+      })
+      setActivityView('active')
+      setCurrentActivity(activity.id)
+    } catch (err) {
+      console.error('Error restoring activity:', err)
     }
   }
 
@@ -409,13 +485,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
 
   // 修复统计数据：只计算可用的奖品数量
   const stats = {
-    totalActivities: activities.length,
-    activeActivities: activities.filter(a => a.isActive).length,
+    totalActivities: activeActivities.length,
+    activeActivities: activeActivities.filter(a => a.isActive).length,
+    archivedActivities: archivedActivities.length,
     totalCodes: availableCodes.length, // 修改：只计算可用的奖品数量
     usedCodes: currentCodes.filter(code => code.status === 'won').length,
     totalParticipants: currentRecords.length,
     winners: currentRecords.filter(record => record.won).length
   }
+  const currentActivityStatus = currentActivity ? getActivityStatus(currentActivity) : null
 
   const maskPhone = (phone: string) => {
     if (!showPhones) {
@@ -483,13 +561,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-950">抽奖管理后台</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                   <span>当前活动：{currentActivity?.name || '未选择'}</span>
-                  {currentActivity && (
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      currentActivity.isActive
-                        ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-100'
-                        : 'bg-stone-100 text-slate-600 ring-1 ring-stone-200'
-                    }`}>
-                      {currentActivity.isActive ? '进行中' : '已暂停'}
+                  {currentActivityStatus && (
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${currentActivityStatus.badgeClass}`}>
+                      {currentActivityStatus.label}
                     </span>
                   )}
                 </div>
@@ -533,11 +607,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                   onChange={(e) => setCurrentActivity(e.target.value)}
                   className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 sm:min-w-[280px]"
                 >
-                  {activities.map(activity => (
-                    <option key={activity.id} value={activity.id}>
-                      {activity.name} {activity.isActive ? '(进行中)' : '(已暂停)'}
-                    </option>
-                  ))}
+                  {activeActivities.length > 0 && (
+                    <optgroup label="未归档活动">
+                      {activeActivities.map(activity => (
+                        <option key={activity.id} value={activity.id}>
+                          {activity.name} ({getActivityStatus(activity).label})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {archivedActivities.length > 0 && (
+                    <optgroup label="归档活动">
+                      {archivedActivities.map(activity => (
+                        <option key={activity.id} value={activity.id}>
+                          {activity.name} (已归档)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <button
@@ -584,7 +671,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                 icon={Calendar}
                 label="活动"
                 value={`${stats.activeActivities}/${stats.totalActivities}`}
-                helper="进行中 / 总数"
+                helper={`上线 / 未归档，归档 ${stats.archivedActivities} 个`}
                 tone="teal"
               />
               <MetricCard
@@ -657,42 +744,50 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                 <div className="mb-6 rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <div className="flex items-center gap-4">
-                      <div className={`rounded-xl p-3 ${currentActivity.isActive ? 'bg-teal-700' : 'bg-stone-500'}`}>
-                        {currentActivity.isActive ? <Play className="w-6 h-6 text-white" /> : <Pause className="w-6 h-6 text-white" />}
+                      <div className={`rounded-xl p-3 ${currentActivity.isArchived ? 'bg-slate-500' : currentActivity.isActive ? 'bg-teal-700' : 'bg-amber-500'}`}>
+                        {currentActivity.isArchived ? (
+                          <Archive className="w-6 h-6 text-white" />
+                        ) : currentActivity.isActive ? (
+                          <Play className="w-6 h-6 text-white" />
+                        ) : (
+                          <Pause className="w-6 h-6 text-white" />
+                        )}
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-slate-950">{currentActivity.name}</h3>
                         <p className="text-sm text-slate-500">
                           状态：
-                          <span className={`ml-1 font-medium ${currentActivity.isActive ? 'text-teal-700' : 'text-rose-600'}`}>
-                            {currentActivity.isActive ? '进行中' : '已暂停'}
+                          <span className={`ml-1 font-medium ${currentActivityStatus?.textClass || 'text-slate-600'}`}>
+                            {currentActivityStatus?.label}
                           </span>
                           ｜中奖率：{currentActivity.winRate}%
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        onClick={() => copyActivityLink(currentActivity.id)}
-                        className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
-                          copiedLink === currentActivity.id
-                            ? 'border-teal-200 bg-teal-50 text-teal-800'
-                            : 'border-stone-300 bg-white text-slate-700 hover:bg-stone-100'
-                        }`}
-                        aria-label="复制活动直达链接"
-                      >
-                        {copiedLink === currentActivity.id ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            已复制
-                          </>
-                        ) : (
-                          <>
-                            <Link className="w-4 h-4" />
-                            复制链接
-                          </>
-                        )}
-                      </button>
+                      {!currentActivityIsArchived && (
+                        <button
+                          onClick={() => copyActivityLink(currentActivity.id)}
+                          className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                            copiedLink === currentActivity.id
+                              ? 'border-teal-200 bg-teal-50 text-teal-800'
+                              : 'border-stone-300 bg-white text-slate-700 hover:bg-stone-100'
+                          }`}
+                          aria-label="复制活动直达链接"
+                        >
+                          {copiedLink === currentActivity.id ? (
+                            <>
+                              <Check className="w-4 h-4" />
+                              已复制
+                            </>
+                          ) : (
+                            <>
+                              <Link className="w-4 h-4" />
+                              复制链接
+                            </>
+                          )}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEditActivity(currentActivity)}
                         className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-stone-100"
@@ -700,17 +795,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                         <Edit3 className="w-4 h-4" />
                         编辑活动
                       </button>
-                      <button
-                        onClick={handleToggleActive}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                          currentActivity.isActive
-                            ? 'bg-rose-600 text-white hover:bg-rose-700'
-                            : 'bg-teal-700 text-white hover:bg-teal-800'
-                        }`}
-                      >
-                        {currentActivity.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        {currentActivity.isActive ? '暂停抽奖' : '开启抽奖'}
-                      </button>
+                      {currentActivityIsArchived ? (
+                        <button
+                          onClick={() => handleRestoreActivity(currentActivity)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-800"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          恢复归档
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleToggleActive}
+                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                              currentActivity.isActive
+                                ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                : 'bg-teal-700 text-white hover:bg-teal-800'
+                            }`}
+                          >
+                            {currentActivity.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            {currentActivity.isActive ? '下线活动' : '重新上线'}
+                          </button>
+                          <button
+                            onClick={() => handleArchiveActivity(currentActivity)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                          >
+                            <Archive className="w-4 h-4" />
+                            归档活动
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -733,7 +847,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                           max="100"
                           value={currentActivity.winRate}
                           onChange={(e) => handleWinRateChange(Number(e.target.value))}
-                          className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-stone-200"
+                          disabled={currentActivityIsArchived}
+                          className={`slider h-2 w-full appearance-none rounded-lg bg-stone-200 ${currentActivityIsArchived ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                         />
                         <div className="flex items-center justify-between text-sm text-gray-600">
                           <span>0%</span>
@@ -774,7 +889,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">抽奖活动管理</h2>
-                <p className="mt-1 text-sm text-slate-500">创建活动后可复制直达链接发给参与者。</p>
+                <p className="mt-1 text-sm text-slate-500">下线会保留公开页但停止抽奖；归档会从公开列表隐藏并保留数据。</p>
               </div>
               <button
                 onClick={handleCreateActivity}
@@ -785,37 +900,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
               </button>
             </div>
 
-            {activities.length === 0 ? (
+            <div className="mb-5 inline-flex rounded-2xl bg-stone-100 p-1">
+              <button
+                type="button"
+                onClick={() => setActivityView('active')}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  activityView === 'active'
+                    ? 'bg-white text-teal-800 shadow-sm'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-950'
+                }`}
+              >
+                未归档 {activeActivities.length}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivityView('archived')}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  activityView === 'archived'
+                    ? 'bg-white text-teal-800 shadow-sm'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-950'
+                }`}
+              >
+                已归档 {archivedActivities.length}
+              </button>
+            </div>
+
+            {visibleActivities.length === 0 ? (
               <EmptyState
-                icon={Calendar}
-                title="还没有抽奖活动"
-                description="先创建一个活动，再添加奖品类型和奖品码。"
-                actionLabel="创建活动"
-                onAction={handleCreateActivity}
+                icon={activityView === 'archived' ? Archive : Calendar}
+                title={activityView === 'archived' ? '还没有归档活动' : '还没有未归档活动'}
+                description={activityView === 'archived'
+                  ? '归档后的活动会保留数据，并集中出现在这里。'
+                  : '先创建一个活动，再添加奖品类型和奖品码。'}
+                actionLabel={activityView === 'active' ? '创建活动' : undefined}
+                onAction={activityView === 'active' ? handleCreateActivity : undefined}
               />
             ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {activities.map((activity) => {
+              {visibleActivities.map((activity) => {
                 const activityCodes = codes.filter(c => c.lotteryId === activity.id)
                 const activityAvailableCodes = activityCodes.filter(c => c.status === 'unused')
                 const activityRecords = records.filter(r => r.lotteryId === activity.id)
+                const activityStatus = getActivityStatus(activity)
 
                 return (
-                  <div key={activity.id} className="border rounded-xl p-6 hover:shadow-md transition-shadow">
+                  <div key={activity.id} className={`rounded-xl border p-6 transition-shadow hover:shadow-md ${activity.isArchived ? 'border-slate-200 bg-slate-50/60' : 'bg-white'}`}>
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className={`rounded-lg p-2 ${activity.isActive ? 'bg-teal-50' : 'bg-stone-100'}`}>
-                          <Calendar className={`h-5 w-5 ${activity.isActive ? 'text-teal-700' : 'text-slate-500'}`} />
+                        <div className={`rounded-lg p-2 ${activityStatus.iconWrapClass}`}>
+                          {activity.isArchived ? (
+                            <Archive className={`h-5 w-5 ${activityStatus.iconClass}`} />
+                          ) : (
+                            <Calendar className={`h-5 w-5 ${activityStatus.iconClass}`} />
+                          )}
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900">{activity.name}</h3>
                           <p className="text-sm text-gray-600">{activity.description}</p>
                         </div>
                       </div>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        activity.isActive ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-100' : 'bg-stone-100 text-slate-600 ring-1 ring-stone-200'
-                      }`}>
-                        {activity.isActive ? '进行中' : '已暂停'}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${activityStatus.badgeClass}`}>
+                        {activityStatus.label}
                       </span>
                     </div>
 
@@ -842,35 +987,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                       </div>
                     </div>
 
-                    {/* 活动直达链接 */}
-                    <div className="mb-4 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                      <div className="text-xs text-gray-600 mb-2">活动直达链接：</div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 text-xs text-gray-800 font-mono bg-white px-2 py-1 rounded border truncate">
-                          {generateActivityLink(activity.id)}
+                    {!activity.isArchived && (
+                      <div className="mb-4 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                        <div className="text-xs text-gray-600 mb-2">活动直达链接：</div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 text-xs text-gray-800 font-mono bg-white px-2 py-1 rounded border truncate">
+                            {generateActivityLink(activity.id)}
+                          </div>
+                          <button
+                            onClick={() => copyActivityLink(activity.id)}
+                            className={`p-1 rounded transition-colors ${
+                              copiedLink === activity.id
+                                ? 'text-teal-700 bg-teal-50'
+                                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200'
+                            }`}
+                            aria-label="复制链接"
+                          >
+                            {copiedLink === activity.id ? (
+                              <Check className="w-3 h-3" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => copyActivityLink(activity.id)}
-                          className={`p-1 rounded transition-colors ${
-                            copiedLink === activity.id
-                              ? 'text-teal-700 bg-teal-50'
-                              : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200'
-                          }`}
-                          aria-label="复制链接"
-                        >
-                          {copiedLink === activity.id ? (
-                            <Check className="w-3 h-3" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => setCurrentActivity(activity.id)}
-                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                        className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                           currentActivityId === activity.id
                             ? 'bg-teal-700 text-white'
                             : 'bg-stone-100 text-slate-700 hover:bg-stone-200'
@@ -881,13 +1027,50 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
                       <button
                         onClick={() => handleEditActivity(activity)}
                         className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-stone-100 hover:text-slate-800"
+                        aria-label="编辑活动"
+                        title="编辑活动"
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
+                      {!activity.isArchived && (
+                        <button
+                          onClick={() => handleSetActivityActive(activity, !activity.isActive)}
+                          className={`rounded-lg p-2 transition-colors ${
+                            activity.isActive
+                              ? 'text-amber-700 hover:bg-amber-50 hover:text-amber-800'
+                              : 'text-teal-700 hover:bg-teal-50 hover:text-teal-800'
+                          }`}
+                          aria-label={activity.isActive ? '下线活动' : '重新上线'}
+                          title={activity.isActive ? '下线活动' : '重新上线'}
+                        >
+                          {activity.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        </button>
+                      )}
+                      {activity.isArchived ? (
+                        <button
+                          onClick={() => handleRestoreActivity(activity)}
+                          className="rounded-lg p-2 text-teal-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
+                          aria-label="恢复归档"
+                          title="恢复归档"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleArchiveActivity(activity)}
+                          className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                          aria-label="归档活动"
+                          title="归档活动"
+                        >
+                          <Archive className="w-4 h-4" />
+                        </button>
+                      )}
                       {activities.length > 1 && (
                         <button
                           onClick={() => handleDeleteActivity(activity.id, activity.name)}
                           className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50 hover:text-rose-800"
+                          aria-label="永久删除活动"
+                          title="永久删除活动"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

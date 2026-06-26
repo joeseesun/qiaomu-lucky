@@ -59,7 +59,7 @@ export const useLotteryApi = () => {
         return previous
       }
 
-      const nextId = nextActivities[0]?.id || null
+      const nextId = nextActivities.find((activity) => activity.isArchived !== true)?.id || nextActivities[0]?.id || null
       try {
         if (nextId) {
           localStorage.setItem(CURRENT_ACTIVITY_KEY, nextId)

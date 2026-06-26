@@ -86,6 +86,8 @@ export interface LotteryActivity {
   description: string
   winRate: number // 中奖率 0-100
   isActive: boolean // 抽奖是否开启
+  isArchived?: boolean // 是否归档
+  archivedAt?: string | null // 归档时间
   maxDrawsPerPhone: number // 每个手机号最大抽奖次数（保留兼容性）
   createdAt: string
   startTime?: string
