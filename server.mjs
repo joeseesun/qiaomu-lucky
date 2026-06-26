@@ -919,6 +919,10 @@ const routeApi = async (req, res, url) => {
   if (prizeTypeMatch && method === 'PATCH') {
     const prizeTypeId = prizeTypeMatch[1]
     const body = await parseBody(req)
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw Object.assign(new Error('请求内容必须是对象'), { status: 400 })
+    }
+
     const state = await withDataWrite(async (data) => {
       const activity = data.activities.find((item) =>
         item.prizeTypes.some((type) => type.id === prizeTypeId)
@@ -927,16 +931,36 @@ const routeApi = async (req, res, url) => {
 
       if (!prizeType) throw Object.assign(new Error('奖品类型不存在'), { status: 404 })
 
+      const previousName = prizeType.name
+      const previousGeneratedName = `${previousName}奖品`
+      const previousGeneratedDescription = `批量导入的${previousName}`
+      const nextName = body.name === undefined ? prizeType.name : String(body.name).trim()
+      const nextWeight = body.weight === undefined ? prizeType.weight : Number(body.weight)
+
+      if (!nextName) throw Object.assign(new Error('奖品类型名称不能为空'), { status: 400 })
+      if (!Number.isFinite(nextWeight) || nextWeight < 1) {
+        throw Object.assign(new Error('奖品类型权重必须大于 0'), { status: 400 })
+      }
+
       Object.assign(prizeType, {
-        name: String(body.name || prizeType.name).trim(),
-        description: String(body.description || ''),
-        weight: Number(body.weight || prizeType.weight),
-        color: body.color || prizeType.color,
-        icon: body.icon || prizeType.icon
+        name: nextName,
+        description: body.description === undefined ? prizeType.description : String(body.description || ''),
+        weight: nextWeight,
+        color: body.color === undefined ? prizeType.color : String(body.color || prizeType.color),
+        icon: body.icon === undefined ? prizeType.icon : String(body.icon || prizeType.icon)
       })
 
       data.codes = data.codes.map((code) =>
-        code.prizeType === prizeTypeId ? { ...code, weight: prizeType.weight } : code
+        code.prizeType === prizeTypeId
+          ? {
+              ...code,
+              weight: prizeType.weight,
+              prizeName: code.prizeName === previousGeneratedName ? `${prizeType.name}奖品` : code.prizeName,
+              prizeDescription: code.prizeDescription === previousGeneratedDescription
+                ? `批量导入的${prizeType.name}`
+                : code.prizeDescription
+            }
+          : code
       )
 
       return adminState(data)

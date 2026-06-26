@@ -227,13 +227,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
 
   const handleSavePrizeType = async (prizeTypeData: Omit<PrizeType, 'id'>) => {
     try {
-      if (editingPrizeType) {
-        await updatePrizeType(editingPrizeType.id, prizeTypeData)
-      } else {
-        await createPrizeType(prizeTypeData, currentActivity?.id)
-      }
+      await createPrizeType(prizeTypeData, currentActivity?.id)
     } catch (err) {
-      console.error('Error saving prize type:', err)
+      console.error('Error creating prize type:', err)
+      throw err
+    }
+  }
+
+  const handleUpdatePrizeType = async (id: string, prizeTypeData: Omit<PrizeType, 'id'>) => {
+    try {
+      await updatePrizeType(id, prizeTypeData)
+    } catch (err) {
+      console.error('Error updating prize type:', err)
+      throw err
     }
   }
 
@@ -1480,7 +1486,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToLottery }) =>
         isOpen={showPrizeTypeModal}
         onClose={() => setShowPrizeTypeModal(false)}
         onSave={handleSavePrizeType}
-        onUpdate={handleSavePrizeType}
+        onUpdate={handleUpdatePrizeType}
         editingPrizeType={editingPrizeType}
       />
 
