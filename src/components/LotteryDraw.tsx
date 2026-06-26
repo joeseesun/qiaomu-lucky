@@ -114,7 +114,7 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
     }
 
     if (!currentActivity.isActive) {
-      setResult({ success: false, message: '抽奖活动暂未开启', won: false })
+      setResult({ success: false, message: '抽奖活动已下线', won: false })
       return
     }
 
@@ -304,7 +304,7 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
                     <div>
                       <div className="font-medium">{activity.name}</div>
                       <div className="text-xs text-gray-500">
-                        {activity.isActive ? '进行中' : '已暂停'}
+                        {activity.isActive ? '已上线' : '已下线'}
                         {activity.displaySettings?.showWinRate && ` • 中奖率 ${activity.winRate}%`}
                       </div>
                     </div>
@@ -356,7 +356,7 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
             {!currentActivity.isActive && (
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2">
                 <AlertTriangle className="h-4 w-4 text-amber-700" />
-                <span className="font-medium text-amber-800">抽奖活动暂未开启</span>
+                <span className="font-medium text-amber-800">抽奖活动已下线</span>
               </div>
             )}
           </div>
@@ -399,7 +399,7 @@ const LotteryDraw: React.FC<LotteryDrawProps> = ({ urlActivityId }) => {
                 ) : (
                   <>
                     <Sparkles className="w-6 h-6" />
-                    {isLotteryDisabled ? '抽奖暂停' : '开始抽奖'}
+                    {isLotteryDisabled ? '抽奖已下线' : '开始抽奖'}
                   </>
                 )}
               </button>
